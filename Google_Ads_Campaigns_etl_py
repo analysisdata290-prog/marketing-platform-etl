@@ -1,0 +1,170 @@
+# %%
+import requests
+import time
+import os
+from datetime import datetime, timedelta
+from supabase import create_client
+from google.ads.googleads.client import GoogleAdsClient
+from google.ads.googleads.errors import GoogleAdsException
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# ================== SUPABASE CONFIG ==================
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# ================== GOOGLE ADS API CREDENTIALS ==================
+# ⚠️ Note: All sensitive credentials are loaded from environment variables.
+CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+REFRESH_TOKEN = os.getenv("GOOGLE_REFRESH_TOKEN")
+DEVELOPER_TOKEN = os.getenv("GOOGLE_DEVELOPER_TOKEN")
+LOGIN_CUSTOMER_ID = os.getenv("GOOGLE_LOGIN_CUSTOMER_ID")
+
+# ================== CLIENTS DATA (Google Ads - Sanitized) ==================
+# ⚠️ Note: This is a sanitized version for portfolio purposes.
+# Client names and customer IDs have been replaced with placeholders.
+clients = [
+    {"name": "Client_01", "client_customer_id": "CUSTOMER_ID_01", "start_date": "2025-04-20", "conversion_type": "LEAD"},
+    {"name": "Client_02", "client_customer_id": "CUSTOMER_ID_02", "start_date": "2026-04-28", "conversion_type": "PURCHASE"},
+    {"name": "Client_03", "client_customer_id": "CUSTOMER_ID_03", "start_date": "2025-12-16", "conversion_type": "LEAD"},
+    {"name": "Client_04", "client_customer_id": "CUSTOMER_ID_04", "start_date": "2026-04-23", "conversion_type": "PURCHASE"},
+]
+
+# ================== SETUP GOOGLE ADS CLIENT ==================
+def get_google_ads_client():
+    credentials = {
+        "developer_token": DEVELOPER_TOKEN,
+        "refresh_token": REFRESH_TOKEN,
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "login_customer_id": LOGIN_CUSTOMER_ID,
+        "use_proto_plus": True,
+    }
+    return GoogleAdsClient.load_from_dict(credentials)
+
+# ================== FETCH GOOGLE ADS CAMPAIGNS ==================
+def fetch_google_ads_campaigns(client, customer_id, start_date, end_date, client_name, conversion_type):
+    ga_service = client.get_service("GoogleAdsService")
+    
+    query = f"""
+        SELECT
+            campaign.id,
+            campaign.name,
+            campaign.status,
+            campaign.advertising_channel_type,
+            segments.date,
+            metrics.impressions,
+            metrics.clicks,
+            metrics.cost_micros,
+            metrics.ctr,
+            metrics.average_cpc,
+            metrics.average_cpm,
+            metrics.conversions,
+            metrics.conversions_value
+        FROM campaign
+        WHERE segments.date BETWEEN '{start_date}' AND '{end_date}'
+    """
+    
+    try:
+        response = ga_service.search(customer_id=customer_id, query=query)
+    except GoogleAdsException as e:
+        print(f"   ❌ Google Ads API Error: {e}")
+        return []
+    
+    records = []
+    for row in response:
+        cost_micros = row.metrics.cost_micros or 0
+        conversions = row.metrics.conversions or 0.0
+        conversions_value = row.metrics.conversions_value or 0.0
+        
+        cpc = (row.metrics.average_cpc or 0.0) / 1_000_000
+        cpm = (row.metrics.average_cpm or 0.0) / 1_000_000
+        
+        if conversion_type == "PURCHASE":
+            purchases = conversions
+            leads = 0.0
+        else:
+            purchases = 0.0
+            leads = conversions
+        
+        records.append({
+            "campaign_id": row.campaign.id,
+            "campaign_name": row.campaign.name,
+            "client_id": customer_id,
+            "client_name": client_name,
+            "date": row.segments.date,
+            "impressions": row.metrics.impressions or 0,
+            "clicks": row.metrics.clicks or 0,
+            "cost_micros": cost_micros,
+            "ctr": row.metrics.ctr or 0.0,
+            "average_cpc": cpc,
+            "average_cpm": cpm,
+            "conversions": conversions,
+            "conversions_value": conversions_value,
+            "purchases": purchases,
+            "leads": leads,
+            "spend": cost_micros / 1_000_000,
+            "revenue": conversions_value,
+            "campaign_status": row.campaign.status.name,
+            "advertising_channel_type": row.campaign.advertising_channel_type.name,
+            "conversion_type": conversion_type,
+        })
+    
+    return records
+
+# ================== SAVE TO SUPABASE ==================
+def save_to_supabase(records):
+    if not records:
+        return
+    
+    for record in records:
+        try:
+            result = supabase.table("google_ads_campaign_performance").upsert(record).execute()
+            print(f"   ✅ Saved: {record['campaign_name'][:30]} - {record['date']}")
+        except Exception as e:
+            print(f"   ❌ Error saving: {str(e)}")
+
+# ================== RUN FOR DATE RANGE ==================
+def run_for_date_range(client_name, customer_id, start_date, end_date, conversion_type):
+    print(f"\n👤 Client: {client_name} (ID: {customer_id})")
+    print(f"   📅 From: {start_date} To: {end_date}")
+    print(f"   🏷️  Conversion Type: {conversion_type}")
+    
+    google_ads_client = get_google_ads_client()
+    records = fetch_google_ads_campaigns(google_ads_client, customer_id, start_date, end_date, client_name, conversion_type)
+    
+    if records:
+        print(f"   📊 Found {len(records)} records")
+        save_to_supabase(records)
+    else:
+        print(f"   ⚠️ No data found for this period")
+
+# ================== MAIN ==================
+def main():
+    end_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    print("\n" + "="*60)
+    print("🚀 RUNNING GOOGLE ADS CAMPAIGNS ETL")
+    print(f"📅 End Date: {end_date}")
+    print("="*60)
+    
+    for client in clients:
+        run_for_date_range(
+            client["name"],
+            client["client_customer_id"],
+            client["start_date"],
+            end_date,
+            client["conversion_type"]
+        )
+        time.sleep(1)
+    
+    print("\n" + "="*60)
+    print("✅ ALL DONE!")
+    print("="*60)
+
+if __name__ == "__main__":
+    main()
