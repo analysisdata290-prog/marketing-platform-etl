@@ -33,5 +33,8 @@ This project automates data collection from multiple ad platforms (Meta, Google,
 
 ## Note
 This is a **sanitized version** for portfolio purposes. All sensitive data (API keys, passwords, client names) has been removed.
--
-- [رابط GitHub بتاعك]
+
+
+
+
+
