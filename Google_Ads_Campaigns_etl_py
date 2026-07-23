@@ -24,14 +24,16 @@ REFRESH_TOKEN = os.getenv("GOOGLE_REFRESH_TOKEN")
 DEVELOPER_TOKEN = os.getenv("GOOGLE_DEVELOPER_TOKEN")
 LOGIN_CUSTOMER_ID = os.getenv("GOOGLE_LOGIN_CUSTOMER_ID")
 
-# ================== CLIENTS DATA (Google Ads - Sanitized) ==================
-# ⚠️ Note: This is a sanitized version for portfolio purposes.
-# Client names and customer IDs have been replaced with placeholders.
+# ================== CLIENTS DATA (Google Ads) ==================
 clients = [
-    {"name": "Client_01", "client_customer_id": "CUSTOMER_ID_01", "start_date": "2025-04-20", "conversion_type": "LEAD"},
-    {"name": "Client_02", "client_customer_id": "CUSTOMER_ID_02", "start_date": "2026-04-28", "conversion_type": "PURCHASE"},
-    {"name": "Client_03", "client_customer_id": "CUSTOMER_ID_03", "start_date": "2025-12-16", "conversion_type": "LEAD"},
-    {"name": "Client_04", "client_customer_id": "CUSTOMER_ID_04", "start_date": "2026-04-23", "conversion_type": "PURCHASE"},
+    # ================== OLD CLIENTS ==================
+    {"name": "Ertwa", "client_customer_id": "4983054956", "start_date": "2025-04-20", "conversion_type": "LEAD"},
+    {"name": "Thumida Store", "client_customer_id": "2864665913", "start_date": "2026-04-28", "conversion_type": "PURCHASE"},
+    {"name": "Al Shabaka For Trade", "client_customer_id": "2962971078", "start_date": "2025-12-16", "conversion_type": "LEAD"},
+    {"name": "Leaders Chairs", "client_customer_id": "4395965419", "start_date": "2026-04-23", "conversion_type": "PURCHASE"},
+    # ================== NEW CLIENTS ==================
+    {"name": "Stable Logistics Solutions", "client_customer_id": "2653361044", "start_date": "2025-07-28", "conversion_type": "LEAD"},
+    {"name": "Tjhiz Office", "client_customer_id": "3843090925", "start_date": "2026-07-02", "conversion_type": "PURCHASE"},
 ]
 
 # ================== SETUP GOOGLE ADS CLIENT ==================
